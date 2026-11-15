@@ -26,7 +26,21 @@ const LOREM = {
 let kit;
 let role;
 let dirty = false;
-const canEdit = () => role === "owner" || role === "editor";
+let previewing = false;
+const mayEdit = () => role === "owner" || role === "editor";
+const canEdit = () => mayEdit() && !previewing;
+
+function applyRole() {
+  const owner = role === "owner" && !previewing;
+  notes.disabled = !canEdit();
+  document.getElementById("add-section").hidden = !canEdit();
+  document.getElementById("viewer-notice").hidden = canEdit();
+  document.getElementById("people").hidden = !owner;
+  document.getElementById("danger").hidden = !owner;
+  document.getElementById("preview-viewer").hidden = !canEdit();
+  document.getElementById("preview-bar").hidden = !previewing;
+  render();
+}
 const elements = () => kit.sections.flatMap((section) => section.elements);
 const find = (elementId) => elements().find((element) => element.id === elementId);
 let borderPainters = [];
@@ -421,6 +435,17 @@ notes.addEventListener("input", () => { kit.notes = notes.value; changed(); });
 
 document.getElementById("download-pdf").addEventListener("click", () => window.print());
 
+document.getElementById("preview-viewer").addEventListener("click", () => {
+  previewing = true;
+  applyRole();
+  window.scrollTo({ top: 0 });
+});
+
+document.getElementById("back-to-editing").addEventListener("click", () => {
+  previewing = false;
+  applyRole();
+});
+
 document.getElementById("download-data").addEventListener("click", async () => {
   if (!(await savedFirst())) return;
   download(`/api/kits/${id}/export`, `${slug(kit.name, "kit")}-ui-kit.json`).catch((error) => setStatus(status, error.message, "error"));
@@ -463,13 +488,8 @@ try {
   document.getElementById("kit-name").textContent = kit.name;
   document.getElementById("saved").textContent = kit.updatedAt ? `Saved ${formatSaved(kit)}` : "Not saved yet";
   notes.value = kit.notes ?? "";
-  notes.disabled = !canEdit();
-  document.getElementById("add-section").hidden = !canEdit();
-  document.getElementById("viewer-notice").hidden = canEdit();
-  document.getElementById("people").hidden = role !== "owner";
-  document.getElementById("danger").hidden = role !== "owner";
   if (role === "owner") renderPeople();
-  render();
+  applyRole();
 } catch (error) {
   document.getElementById("kit-name").textContent = error.status === 404 ? "Kit not found" : "Something went wrong";
   setStatus(status, error.message, "error");

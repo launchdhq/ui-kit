@@ -104,6 +104,12 @@ textarea.input { padding: 8px 12px; min-height: 90px; resize: vertical; }
 .chip { flex: none; width: 36px; height: 36px; border-radius: 6px; border: 1px solid currentColor; }
 .value-tag { font-size: .7rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; opacity: .7; }
 .value-tag.custom { opacity: 1; }
+.tag-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.label-tag { opacity: 1; text-transform: none; letter-spacing: 0; border: 1px solid currentColor; border-radius: 999px; padding: 0 6px; }
+.label-select { font-size: .72rem; min-height: 24px; padding: 0 4px; border: 1px solid currentColor; border-radius: 4px; background: transparent; color: inherit; }
+.label-select option { color: #1a1051; background: #ffffff; }
+.label-list { display: flex; flex-wrap: wrap; gap: 8px; padding: 6px 0; }
+.label-chip { display: inline-flex; align-items: center; gap: 2px; background: var(--soft); border-radius: 999px; padding: 0 2px 0 12px; font-size: .9rem; }
 .border-sample { flex: none; width: 56px; height: 36px; border-radius: 6px; border-style: solid; }
 .mode.light .border-sample { background: #ffffff; }
 .mode.dark .border-sample { background: rgba(255, 255, 255, .06); }

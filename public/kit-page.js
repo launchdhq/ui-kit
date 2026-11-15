@@ -33,9 +33,48 @@ let borderPainters = [];
 let saved = new Map();
 const rememberSaved = () => { saved = new Map(elements().map((element) => [element.id, structuredClone(element)])); };
 
-function tag(element, keys) {
+function tag(element, keys, tagKey) {
   const name = valueTag(saved.get(element.id), keys);
-  return h("span", { class: `value-tag ${name.toLowerCase()}` }, name);
+  const label = element.tags?.[tagKey];
+  const chooser = canEdit() && kit.labels.length > 0
+    ? h("select", { class: "label-select", "aria-label": `Label for ${element.id} ${tagKey}`,
+      onChange: (event) => {
+        element.tags = { ...element.tags, [tagKey]: event.target.value };
+        if (!event.target.value) delete element.tags[tagKey];
+        changed();
+      } },
+    h("option", { value: "" }, "No label"),
+    kit.labels.map((each) => h("option", { value: each, selected: each === label }, each)))
+    : label && h("span", { class: "value-tag label-tag" }, label);
+  return h("span", { class: "tag-row" }, h("span", { class: `value-tag ${name.toLowerCase()}` }, name), chooser);
+}
+
+function labelsSection() {
+  if (!canEdit() && !kit.labels.length) return [];
+  const input = h("input", { class: "input", maxLength: 30, required: true, placeholder: "For example By designer", autocomplete: "off", "aria-label": "New label" });
+  const addLabel = (event) => {
+    event.preventDefault();
+    const label = input.value.trim();
+    if (kit.labels.includes(label)) return setStatus(status, "This label is already in the list.", "error");
+    if (kit.labels.length >= 20) return setStatus(status, "A kit can have 20 labels or fewer.", "error");
+    kit.labels.push(label);
+    render();
+    changed();
+  };
+  const removeLabel = (label) => {
+    kit.labels = kit.labels.filter((each) => each !== label);
+    for (const element of elements()) {
+      for (const [key, value] of Object.entries(element.tags ?? {})) if (value === label) delete element.tags[key];
+    }
+    render();
+    changed();
+  };
+  return [h("section", { class: "section", "aria-label": "Labels" },
+    h("h2", {}, "Labels"),
+    canEdit() && h("p", { class: "small muted", style: "margin: 0" }, "Add a label, for example By designer. Then choose it under any color, font or border."),
+    h("div", { class: "label-list" }, kit.labels.map((label) => h("span", { class: "label-chip" }, label,
+      canEdit() && h("button", { type: "button", class: "icon-button", "aria-label": `Remove the label ${label}`, onClick: () => removeLabel(label) }, "✕")))),
+    canEdit() && h("form", { class: "add-element no-print", onSubmit: addLabel }, h("div", { class: "field grow" }, input), h("button", { type: "submit", class: "button quiet" }, "+ Add label")))];
 }
 
 function uniqueId(text) {
@@ -70,7 +109,7 @@ function colorCell(element, mode, field) {
   });
   return h("div", { class: `cell mode ${mode}` },
     h("div", { class: "pair" }, swatch, text),
-    tag(element, [mode]));
+    tag(element, [mode], mode));
 }
 
 function borderCell(element, mode, field) {
@@ -88,7 +127,7 @@ function borderCell(element, mode, field) {
   } else {
     parts.push(h("span", { class: "small", style: "opacity: .75" }, "Dark mode"));
   }
-  return h("div", { class: `cell mode ${mode}` }, h("div", { class: "pair" }, ...parts), mode === "light" && tag(element, ["width"]));
+  return h("div", { class: `cell mode ${mode}` }, h("div", { class: "pair" }, ...parts), mode === "light" && tag(element, ["width"], "width"));
 }
 
 function fontCells(element, field) {
@@ -115,7 +154,7 @@ function fontCells(element, field) {
   return [
     h("div", { class: "cell" }, family, url,
       canEdit() && h("span", { class: "small muted" }, "Leave the URL empty for Google Fonts. For Adobe Fonts, add this app's address to the kit's domains."),
-      tag(element, ["family", "weight", "url"])),
+      tag(element, ["family", "weight", "url"], "font")),
     h("div", { class: "cell" }, weight, sample, warning),
   ];
 }
@@ -181,7 +220,7 @@ function addElementForm(section) {
 
 function render() {
   borderPainters = [];
-  sectionsElement.replaceChildren(...kit.sections.map((section, s) => h("section", { class: "section", "aria-label": section.title },
+  sectionsElement.replaceChildren(...labelsSection(), ...kit.sections.map((section, s) => h("section", { class: "section", "aria-label": section.title },
     h("div", { class: "section-head" }, h("h2", {}, section.title),
       canEdit() && h("button", { type: "button", class: "button quiet no-print", "aria-label": `Remove the section ${section.title}`,
         onClick: () => {
@@ -311,7 +350,7 @@ saveButton.addEventListener("click", async () => {
   saveButton.disabled = true;
   setStatus(status, "Saving…");
   try {
-    const result = await api("PUT", `/api/kits/${id}`, { name: kit.name, notes: kit.notes, sections: kit.sections });
+    const result = await api("PUT", `/api/kits/${id}`, { name: kit.name, notes: kit.notes, labels: kit.labels, sections: kit.sections });
     Object.assign(kit, { updatedAt: result.updatedAt, updatedBy: result.updatedBy });
     dirty = false;
     rememberSaved();
@@ -365,7 +404,7 @@ window.addEventListener("beforeunload", (event) => { if (dirty) event.preventDef
 
 try {
   const [me, loaded] = await Promise.all([api("GET", "/api/me"), api("GET", `/api/kits/${id}`)]);
-  kit = loaded;
+  kit = { labels: [], ...loaded };
   rememberSaved();
   role = kit.role;
   renderTopbar(me, role);

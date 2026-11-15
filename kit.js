@@ -12,10 +12,13 @@ const font = (id, label, family, weight) => ({ id, label, kind: "font", family, 
 const border = (id, label, width) => ({ id, label, kind: "border", width });
 const text = (id, label) => ({ id, label, kind: "text", value: "" });
 
+export const TAG_KEYS = { color: ["light", "dark"], font: ["font"], border: ["width"], text: [] };
+
 export function defaultKit(name) {
   return {
     name,
     notes: "",
+    labels: [],
     sections: [
       { id: "backgrounds-and-text", title: "Backgrounds and text", elements: [
         color("canvas", "Page background", "#ffffff", "#121212"),
@@ -100,10 +103,17 @@ export function cleanKit(input) {
   const errors = [];
   const fail = (field, message) => errors.push({ field, message });
   const seen = new Set();
-  const kit = { name: typeof input?.name === "string" ? input.name.trim() : "", notes: input?.notes ?? "", sections: [] };
+  const kit = { name: typeof input?.name === "string" ? input.name.trim() : "", notes: input?.notes ?? "", labels: [], sections: [] };
 
   if (!isText(kit.name, 80, 1)) fail("name", "Write a name of 1 to 80 characters.");
   if (!isText(kit.notes, 5000)) fail("notes", "Use 5000 characters or fewer.");
+  const labels = Array.isArray(input?.labels) ? input.labels : [];
+  if (labels.length > 20) fail("labels", "Use 20 labels or fewer.");
+  labels.forEach((label, n) => {
+    if (!isText(label, 30, 1)) fail(`labels.${n}`, "Write a label of 1 to 30 characters.");
+    else if (kit.labels.includes(label.trim())) fail(`labels.${n}`, "This label is already in the list.");
+    else kit.labels.push(label.trim());
+  });
 
   (Array.isArray(input?.sections) ? input.sections : []).forEach((section, s) => {
     const at = `sections.${s}`;
@@ -127,6 +137,10 @@ export function cleanKit(input) {
         if (!valid(element[key])) fail(`${here}.${key}`, message);
         else if (element[key] !== undefined) cleanElement[key] = element[key];
       }
+      const tags = Object.fromEntries(TAG_KEYS[element.kind]
+        .filter((key) => kit.labels.includes(element.tags?.[key]))
+        .map((key) => [key, element.tags[key]]));
+      if (Object.keys(tags).length) cleanElement.tags = tags;
       cleanSection.elements.push(cleanElement);
     });
     kit.sections.push(cleanSection);

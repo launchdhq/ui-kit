@@ -1,7 +1,7 @@
 import http from "node:http";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { extname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { VERSION, defaultKit, cleanKit } from "./kit.js";
 
@@ -9,6 +9,16 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const EMAIL = /^[^\s@/]+@[^\s@/]+\.[^\s@/]+$/;
 const ROLES = ["editor", "viewer"];
 const MAX_BODY = 1_000_000;
+const KIT_PAGE = /^\/kits\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const FILES = {
+  "/": "public/index.html",
+  "/app.css": "public/app.css",
+  "/ui.js": "public/ui.js",
+  "/index.js": "public/index.js",
+  "/kit-page.js": "public/kit-page.js",
+  "/kit.js": "kit.js",
+};
+const TYPES = { ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8" };
 
 class HttpError extends Error {
   constructor(status, body) {
@@ -85,6 +95,7 @@ export function createServer({ dataDir, ownerEmail }) {
   }
 
   const routes = [
+    ["GET", /^\/api\/me$/, async ({ email }) => ({ email, owner: email === owner })],
     ["GET", /^\/api\/kits$/, async ({ email }) => (await readable(email)).map((kit) => {
       const role = roleOf(kit, email);
       const colors = kit.sections.flatMap((section) => section.elements).filter((element) => element.kind === "color");
@@ -149,6 +160,8 @@ export function createServer({ dataDir, ownerEmail }) {
   async function handle(request) {
     await ready;
     const path = new URL(request.url, "http://localhost").pathname;
+    const file = request.method === "GET" && (FILES[path] ?? (KIT_PAGE.test(path) && "public/kit.html"));
+    if (file) return [200, await readFile(join(import.meta.dirname, file)), TYPES[extname(file)]];
     for (const [method, pattern, action] of routes) {
       const match = request.method === method && path.match(pattern);
       if (!match) continue;
@@ -163,12 +176,16 @@ export function createServer({ dataDir, ownerEmail }) {
   }
 
   return http.createServer(async (request, response) => {
-    let status, body;
+    let status, body, type;
     try {
-      [status, body] = await handle(request);
+      [status, body, type] = await handle(request);
     } catch (error) {
       if (!(error instanceof HttpError)) console.error(error);
       [status, body] = error instanceof HttpError ? [error.status, error.body] : [500, { error: "The server had a problem. Try again." }];
+    }
+    if (type) {
+      response.writeHead(status, { "Content-Type": type, "Cache-Control": "no-cache" });
+      return response.end(body);
     }
     response.writeHead(status, body === undefined ? {} : { "Content-Type": "application/json" });
     response.end(body === undefined ? undefined : JSON.stringify(body));

@@ -239,6 +239,27 @@ test("a body over 1 MB gets 413, even when it has fewer than a million character
   assert.equal((await call("PUT", `/api/kits/${kitId}`, EDITOR, { notes })).status, 413);
 });
 
+test("me tells the page who the visitor is", async () => {
+  assert.deepEqual((await call("GET", "/api/me", OWNER)).body, { email: OWNER, owner: true });
+  assert.deepEqual((await call("GET", "/api/me", VIEWER)).body, { email: VIEWER, owner: false });
+  assert.equal((await call("GET", "/api/me")).status, 401);
+});
+
+test("the server sends the pages and their scripts", async () => {
+  for (const [path, type] of [["/", "text/html"], [`/kits/${kitId}`, "text/html"], ["/kit.js", "text/javascript"],
+    ["/index.js", "text/javascript"], ["/kit-page.js", "text/javascript"], ["/ui.js", "text/javascript"], ["/app.css", "text/css"]]) {
+    const response = await fetch(base + path, { headers: { "X-Launchd-Email": OWNER } });
+    assert.equal(response.status, 200, path);
+    assert.match(response.headers.get("content-type"), new RegExp(type), path);
+  }
+});
+
+test("the server sends no other files", async () => {
+  for (const path of ["/server.js", "/package.json", "/../server.js", "/%2e%2e/server.js", "/kits/not-a-uuid", "/public/index.html"]) {
+    assert.equal((await fetch(base + path)).status, 404, path);
+  }
+});
+
 test("emails match in any case", async () => {
   await call("PUT", `/api/kits/${kitId}/members/Mixed@Client.COM`, OWNER, { role: "viewer" });
   assert.equal((await call("GET", `/api/kits/${kitId}`, "mixed@client.com")).body.role, "viewer");

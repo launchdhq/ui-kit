@@ -1,6 +1,7 @@
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import http from "node:http";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createServer } from "../server.js";
@@ -184,6 +185,58 @@ test("a member role must be editor or viewer", async () => {
 
 test("a member email must look like an email", async () => {
   assert.equal((await call("PUT", `/api/kits/${kitId}/members/not-an-email`, OWNER, { role: "viewer" })).status, 422);
+});
+
+test("a member that the owner removes during a save stays removed", async () => {
+  const kit = (await call("GET", `/api/kits/${kitId}`, EDITOR)).body;
+  for (let round = 0; round < 20; round++) {
+    await call("PUT", `/api/kits/${kitId}/members/${VIEWER}`, OWNER, { role: "viewer" });
+    await Promise.all([
+      call("PUT", `/api/kits/${kitId}`, EDITOR, kit),
+      call("DELETE", `/api/kits/${kitId}/members/${VIEWER}`, OWNER),
+    ]);
+    assert.equal((await call("GET", `/api/kits/${kitId}`, VIEWER)).status, 404, `round ${round}`);
+  }
+});
+
+test("the save response shows the members only to the owner", async () => {
+  const kit = (await call("GET", `/api/kits/${kitId}`, EDITOR)).body;
+  const editorSave = await call("PUT", `/api/kits/${kitId}`, EDITOR, kit);
+  assert.equal(editorSave.body.members, undefined);
+  assert.equal(editorSave.body.role, "editor");
+  const ownerSave = await call("PUT", `/api/kits/${kitId}`, OWNER, kit);
+  assert.deepEqual(ownerSave.body.members, { [EDITOR]: "editor", [VIEWER]: "viewer" });
+});
+
+test("a file in the kits folder that is not a kit does not break the list", async () => {
+  await writeFile(join(dataDir, "kits", "backup.json"), "{}");
+  assert.equal((await call("GET", "/api/kits", OWNER)).status, 200);
+  assert.equal((await call("GET", "/api/export", OWNER)).status, 200);
+});
+
+test("a URL with a bad escape gets 404", async () => {
+  assert.equal((await call("GET", "/api/kits/%E0%A4%A", OWNER)).status, 404);
+  assert.equal((await call("DELETE", `/api/kits/${kitId}/members/%ZZ`, OWNER)).status, 404);
+});
+
+test("a character split across two parts of the body is kept", async () => {
+  const kit = (await call("GET", `/api/kits/${kitId}`, EDITOR)).body;
+  const body = Buffer.from(JSON.stringify({ ...kit, notes: "Designer’s note" }));
+  const split = body.indexOf(Buffer.from("’")) + 1;
+  const status = await new Promise((resolve, reject) => {
+    const request = http.request(`${base}/api/kits/${kitId}`, { method: "PUT", headers: { "X-Launchd-Email": EDITOR, "Content-Type": "application/json" } },
+      (response) => { response.resume(); response.on("end", () => resolve(response.statusCode)); });
+    request.on("error", reject);
+    request.write(body.subarray(0, split));
+    setTimeout(() => request.end(body.subarray(split)), 50);
+  });
+  assert.equal(status, 200);
+  assert.equal((await call("GET", `/api/kits/${kitId}`, VIEWER)).body.notes, "Designer’s note");
+});
+
+test("a body over 1 MB gets 413, even when it has fewer than a million characters", async () => {
+  const notes = "’".repeat(400_000);
+  assert.equal((await call("PUT", `/api/kits/${kitId}`, EDITOR, { notes })).status, 413);
 });
 
 test("emails match in any case", async () => {

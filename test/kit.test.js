@@ -84,6 +84,19 @@ test("an element kind must be color, font, border or text", () => {
   assert.deepEqual(fields(result), ["sections.0.elements.0.kind"]);
 });
 
+test("a kind that is a name on every object, such as constructor, is refused", () => {
+  for (const kind of ["constructor", "toString", "__proto__"]) {
+    const result = cleanKit(kitWith({ id: "s", label: "S", kind }));
+    assert.deepEqual(fields(result), ["sections.0.elements.0.kind"], kind);
+  }
+});
+
+test("a section note has at most 300 characters", () => {
+  const kit = defaultKit("Acme");
+  kit.sections[0].note = "x".repeat(301);
+  assert.deepEqual(fields(cleanKit(kit)), ["sections.0.note"]);
+});
+
 test("a kit must have a name", () => {
   assert.deepEqual(fields(cleanKit({ ...defaultKit("Acme"), name: " " })), ["name"]);
 });

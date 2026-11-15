@@ -113,7 +113,8 @@ export function cleanKit(input) {
     if (!ID.test(section?.id ?? "")) fail(`${at}.id`, "Use lowercase letters, digits and dashes.");
     if (!isText(section?.title, 80, 1)) fail(`${at}.title`, "Write a title of 1 to 80 characters.");
     const cleanSection = { id: section?.id, title: section?.title, elements: [] };
-    if (isText(section?.note, 300, 1)) cleanSection.note = section.note;
+    if (section?.note !== undefined && !isText(section.note, 300)) fail(`${at}.note`, "Use 300 characters or fewer.");
+    else if (section?.note) cleanSection.note = section.note;
 
     (Array.isArray(section?.elements) ? section.elements : []).forEach((element, e) => {
       const here = `${at}.elements.${e}`;
@@ -121,8 +122,8 @@ export function cleanKit(input) {
       else if (seen.has(element.id)) fail(`${here}.id`, "This id is already in the kit. Use a different id.");
       seen.add(element?.id);
       if (!isText(element?.label, 120)) fail(`${here}.label`, "Use 120 characters or fewer.");
-      const rules = RULES[element?.kind];
-      if (!rules) return fail(`${here}.kind`, `Use one of: ${KINDS.join(", ")}.`);
+      if (!Object.hasOwn(RULES, element?.kind ?? "")) return fail(`${here}.kind`, `Use one of: ${KINDS.join(", ")}.`);
+      const rules = RULES[element.kind];
 
       const cleanElement = { id: element.id, label: element.label, kind: element.kind };
       for (const [key, [valid, message]] of Object.entries(rules)) {

@@ -45,8 +45,25 @@ export function createServer({ dataDir, ownerEmail }) {
 
   async function readable(email) {
     const ids = (await readdir(kitsDir)).filter((file) => file.endsWith(".json")).map((file) => file.slice(0, -5));
-    const kits = await Promise.all(ids.map(async (id) => ({ id, ...(await load(id)) })));
-    return kits.filter((kit) => roleOf(kit, email)).sort((a, b) => a.name.localeCompare(b.name));
+    const kits = await Promise.all(ids.map(async (id) => {
+      const kit = await load(id);
+      return kit?.members && { id, ...kit };
+    }));
+    return kits.filter((kit) => kit && roleOf(kit, email)).sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  const queues = new Map();
+  function oneAtATime(id, action) {
+    const run = (queues.get(id) ?? Promise.resolve()).then(action);
+    const done = run.catch(() => {});
+    queues.set(id, done);
+    done.then(() => queues.get(id) === done && queues.delete(id));
+    return run;
+  }
+
+  function view(id, kit, role) {
+    const { members, ...rest } = kit;
+    return { id, ...rest, role, ...(role === "owner" && { members }) };
   }
 
   async function kitFor(id, email, allowed) {
@@ -85,44 +102,46 @@ export function createServer({ dataDir, ownerEmail }) {
     ["GET", /^\/api\/export$/, async ({ email }) => (await readable(email)).map(exported)],
     ["GET", /^\/api\/kits\/([^/]+)$/, async ({ email, params: [id] }) => {
       const { kit, role } = await kitFor(id, email, ["owner", "editor", "viewer"]);
-      const { members, ...rest } = kit;
-      return { id, ...rest, role, ...(role === "owner" && { members }) };
+      return view(id, kit, role);
     }],
     ["GET", /^\/api\/kits\/([^/]+)\/export$/, async ({ email, params: [id] }) =>
       exported((await kitFor(id, email, ["owner", "editor", "viewer"])).kit)],
-    ["PUT", /^\/api\/kits\/([^/]+)$/, async ({ email, body, params: [id] }) => {
-      const { kit } = await kitFor(id, email, ["owner", "editor"]);
+    ["PUT", /^\/api\/kits\/([^/]+)$/, ({ email, body, params: [id] }) => oneAtATime(id, async () => {
+      const { kit, role } = await kitFor(id, email, ["owner", "editor"]);
       const saved = { version: VERSION, ...stamp(validated(body), email), members: kit.members };
       await store(id, saved);
-      return { id, ...saved };
-    }],
-    ["DELETE", /^\/api\/kits\/([^/]+)$/, async ({ email, params: [id] }) => {
+      return view(id, saved, role);
+    })],
+    ["DELETE", /^\/api\/kits\/([^/]+)$/, ({ email, params: [id] }) => oneAtATime(id, async () => {
       await kitFor(id, email, ["owner"]);
       await rm(kitPath(id));
       return [204];
-    }],
-    ["PUT", /^\/api\/kits\/([^/]+)\/members\/([^/]+)$/, async ({ email, body, params: [id, member] }) => {
+    })],
+    ["PUT", /^\/api\/kits\/([^/]+)\/members\/([^/]+)$/, ({ email, body, params: [id, member] }) => oneAtATime(id, async () => {
       const { kit } = await kitFor(id, email, ["owner"]);
       const memberEmail = normalize(member);
       if (!EMAIL.test(memberEmail)) throw new HttpError(422, { errors: [{ field: "email", message: "Write a valid email address." }] });
       if (!ROLES.includes(body?.role)) throw new HttpError(422, { errors: [{ field: "role", message: "Use editor or viewer." }] });
       await store(id, { ...kit, members: { ...kit.members, [memberEmail]: body.role } });
       return { email: memberEmail, role: body.role };
-    }],
-    ["DELETE", /^\/api\/kits\/([^/]+)\/members\/([^/]+)$/, async ({ email, params: [id, member] }) => {
+    })],
+    ["DELETE", /^\/api\/kits\/([^/]+)\/members\/([^/]+)$/, ({ email, params: [id, member] }) => oneAtATime(id, async () => {
       const { kit } = await kitFor(id, email, ["owner"]);
       const { [normalize(member)]: _removed, ...members } = kit.members;
       await store(id, { ...kit, members });
       return [204];
-    }],
+    })],
   ];
 
   async function readBody(request) {
-    let text = "";
+    const chunks = [];
+    let bytes = 0;
     for await (const chunk of request) {
-      text += chunk;
-      if (text.length > MAX_BODY) throw new HttpError(413, { error: "The request is too large." });
+      bytes += chunk.length;
+      if (bytes <= MAX_BODY) chunks.push(chunk);
     }
+    if (bytes > MAX_BODY) throw new HttpError(413, { error: "The request is too large." });
+    const text = Buffer.concat(chunks).toString("utf8");
     if (!text) return undefined;
     try { return JSON.parse(text); } catch { throw new HttpError(400, { error: "The request body is not valid JSON." }); }
   }
@@ -135,7 +154,8 @@ export function createServer({ dataDir, ownerEmail }) {
       if (!match) continue;
       const email = normalize(request.headers["x-launchd-email"]);
       if (!email) throw new HttpError(401, { error: "Sign in to Launchd to use this app." });
-      const params = match.slice(1).map(decodeURIComponent);
+      let params;
+      try { params = match.slice(1).map(decodeURIComponent); } catch { throw new HttpError(404, { error: "This page does not exist." }); }
       const result = await action({ email, params, body: await readBody(request) });
       return Array.isArray(result) && typeof result[0] === "number" ? result : [200, result];
     }

@@ -1,5 +1,5 @@
-import { FAMILY, FONT_FILE, HEX, KINDS, isFontUrl, valueTag } from "/kit.js";
-import { ROLE_LABELS, api, download, formatSaved, h, renderTopbar, setStatus, slug } from "/ui.js";
+import { FAMILY, FONT_FILE, HEX, KINDS, isFontUrl, toCss, valueTag } from "/kit.js";
+import { ROLE_LABELS, api, download, formatSaved, h, renderTopbar, saveFile, setStatus, slug } from "/ui.js";
 
 const id = window.location.pathname.split("/").pop();
 const status = document.getElementById("status");
@@ -335,6 +335,21 @@ document.getElementById("download-pdf").addEventListener("click", () => window.p
 document.getElementById("download-data").addEventListener("click", () => {
   if (dirty) return setStatus(status, "Save your changes first. The download has only the saved values.", "error");
   download(`/api/kits/${id}/export`, `${slug(kit.name, "kit")}-ui-kit.json`).catch((error) => setStatus(status, error.message, "error"));
+});
+
+document.getElementById("copy-css").addEventListener("click", async () => {
+  if (dirty) return setStatus(status, "Save your changes first. The CSS has only the saved values.", "error");
+  try {
+    await navigator.clipboard.writeText(toCss(kit));
+    setStatus(status, "Copied the CSS. Paste it into your stylesheet.", "ok");
+  } catch {
+    setStatus(status, "Copy did not work. Click Download CSS, then open the file.", "error");
+  }
+});
+
+document.getElementById("download-css").addEventListener("click", () => {
+  if (dirty) return setStatus(status, "Save your changes first. The CSS has only the saved values.", "error");
+  saveFile(toCss(kit), `${slug(kit.name, "kit")}-ui-kit.css`, "text/css");
 });
 
 document.getElementById("delete-kit").addEventListener("click", async () => {

@@ -134,3 +134,34 @@ export function cleanKit(input) {
 
   return { kit, errors };
 }
+
+export function toCss(kit) {
+  const elements = kit.sections.flatMap((section) => section.elements);
+  const colors = elements.filter((element) => element.kind === "color");
+  const fonts = elements.filter((element) => element.kind === "font");
+  const googleWeights = new Map();
+  const imports = new Set();
+  const faces = [];
+  for (const { family, weight, url } of fonts) {
+    if (!url) googleWeights.set(family, new Set([...(googleWeights.get(family) ?? []), weight]));
+    else if (FONT_FILE.test(new URL(url).pathname)) faces.push(`@font-face {\n  font-family: "${family}";\n  src: url(${JSON.stringify(url)});\n  font-weight: ${weight};\n}`);
+    else imports.add(url);
+  }
+  for (const [family, weights] of googleWeights) {
+    imports.add(`https://fonts.googleapis.com/css2?family=${family.replace(/ /g, "+")}:wght@${[...weights].sort((a, b) => a - b).join(";")}&display=swap`);
+  }
+  const block = (selector, lines, indent = "") => `${indent}${selector} {\n${lines.map((line) => `${indent}  ${line}`).join("\n")}\n${indent}}`;
+  const light = [
+    ...colors.map((element) => `--${element.id}: ${element.light.toLowerCase()};`),
+    ...fonts.flatMap((element) => [`--${element.id}: "${element.family}", sans-serif;`, `--${element.id}-weight: ${element.weight};`]),
+    ...elements.filter((element) => element.kind === "border").map((element) => `--${element.id}: ${element.width}px;`),
+  ];
+  const name = kit.name.replaceAll("*/", "").replace(/\s+/g, " ").trim();
+  return [
+    `/* ${name} UI kit */`,
+    ...[...imports].map((url) => `@import url(${JSON.stringify(url)});`),
+    ...faces,
+    block(":root", light),
+    `@media (prefers-color-scheme: dark) {\n${block(":root", colors.map((element) => `--${element.id}: ${element.dark.toLowerCase()};`), "  ")}\n}`,
+  ].join("\n\n") + "\n";
+}

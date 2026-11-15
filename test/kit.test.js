@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { defaultKit, cleanKit, valueTag } from "../kit.js";
+import { defaultKit, cleanKit, toCss, valueTag } from "../kit.js";
 
 const elements = (kit) => kit.sections.flatMap((section) => section.elements);
 const element = (kit, id) => elements(kit).find((each) => each.id === id);
@@ -125,4 +125,47 @@ test("a kit must have a name", () => {
 test("cleaning drops fields that the rules do not know", () => {
   const { kit } = cleanKit({ ...kitWith({ id: "t", label: "T", kind: "text", value: "Hi", onclick: "x" }), members: { "a@b.c": "editor" } });
   assert.deepEqual(kit, { name: "Acme", notes: "", sections: [{ id: "extra", title: "Extra", elements: [{ id: "t", label: "T", kind: "text", value: "Hi" }] }] });
+});
+
+const cssKit = {
+  name: "Acme */ body{}",
+  notes: "",
+  sections: [
+    { id: "colors", title: "Colors", elements: [
+      { id: "canvas", label: "Page background", kind: "color", light: "#ffffff", dark: "#121212" },
+      { id: "accent", label: "Buttons", kind: "color", light: "#1A1051", dark: "#9290f4" },
+    ] },
+    { id: "fonts", title: "Fonts", elements: [
+      { id: "font-display", label: "Headlines", kind: "font", family: "Kanit", weight: 500, url: "" },
+      { id: "font-display-light", label: "Light", kind: "font", family: "Kanit", weight: 300, url: "" },
+      { id: "font-body", label: "Body", kind: "font", family: "Myriad Pro", weight: 400, url: "https://use.typekit.net/abc1def.css" },
+      { id: "font-mono", label: "Code", kind: "font", family: "Berkeley Mono", weight: 400, url: "https://cdn.example.com/berkeley.woff2" },
+    ] },
+    { id: "borders", title: "Borders", elements: [{ id: "border-thin", label: "Lines", kind: "border", width: 1 }] },
+    { id: "text", title: "Preview text", elements: [{ id: "headline", label: "Headline", kind: "text", value: "Hello" }] },
+  ],
+};
+
+test("the CSS has the light values in :root and the dark colors in a dark-mode block", () => {
+  const [light, dark] = toCss(cssKit).split("@media (prefers-color-scheme: dark)");
+  assert.match(light, /:root \{[^}]*--canvas: #ffffff;[^}]*--accent: #1a1051;/);
+  assert.match(light, /--font-display: "Kanit", sans-serif;\n\s+--font-display-weight: 500;/);
+  assert.match(light, /--border-thin: 1px;/);
+  assert.match(dark, /:root \{[^}]*--canvas: #121212;[^}]*--accent: #9290f4;/);
+  assert.doesNotMatch(dark, /font|border/);
+});
+
+test("the CSS loads each font: Google Fonts, a font service, or a font file", () => {
+  const css = toCss(cssKit);
+  assert.match(css, /@import url\("https:\/\/fonts\.googleapis\.com\/css2\?family=Kanit:wght@300;500&display=swap"\);/);
+  assert.match(css, /@import url\("https:\/\/use\.typekit\.net\/abc1def\.css"\);/);
+  assert.match(css, /@font-face \{\n\s+font-family: "Berkeley Mono";\n\s+src: url\("https:\/\/cdn\.example\.com\/berkeley\.woff2"\);\n\s+font-weight: 400;/);
+  assert.ok(css.indexOf("@import") < css.indexOf(":root"), "@import comes before every other rule");
+});
+
+test("the CSS leaves out preview text, and a name cannot end its comment", () => {
+  const css = toCss(cssKit);
+  assert.doesNotMatch(css, /headline|Hello/);
+  assert.equal(css.split("*/").length, 2);
+  assert.match(css, /^\/\* Acme body\{\} UI kit \*\//);
 });

@@ -39,8 +39,11 @@ export function slug(text, fallback) {
 }
 
 export async function download(path, name) {
-  const data = await api("GET", path);
-  const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+  saveFile(JSON.stringify(await api("GET", path), null, 2), name, "application/json");
+}
+
+export function saveFile(content, name, type) {
+  const url = URL.createObjectURL(new Blob([content], { type }));
   const link = h("a", { href: url, download: name });
   document.body.append(link);
   link.click();

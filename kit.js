@@ -5,10 +5,10 @@ const DESIGNER = "Designer’s color";
 const CLAUDE = "Added by Claude";
 const SOURCE = { d: DESIGNER, c: CLAUDE };
 
-const HEX = /^#[0-9a-fA-F]{6}$/;
+export const HEX = /^#[0-9a-fA-F]{6}$/;
 const ID = /^[a-z0-9][a-z0-9-]{0,39}$/;
-const FAMILY = /^[A-Za-z0-9 ]{1,60}$/;
-const FONT_FILE = /\.(woff2|woff|ttf|otf)$/i;
+export const FAMILY = /^[A-Za-z0-9 ]{1,60}$/;
+export const FONT_FILE = /\.(woff2|woff|ttf|otf)$/i;
 const FONT_HOSTS = ["use.typekit.net", "fonts.googleapis.com", "fonts.bunny.net"];
 
 const color = (id, label, light, dark, sourceLight, sourceDark) =>
@@ -69,7 +69,7 @@ export function defaultKit(name) {
 const isText = (value, max, min = 0) => typeof value === "string" && value.trim().length >= min && value.length <= max;
 const isWhole = (value, min, max) => Number.isInteger(value) && value >= min && value <= max;
 
-function isFontUrl(value) {
+export function isFontUrl(value) {
   if (value === "") return true;
   let url;
   try { url = new URL(value); } catch { return false; }

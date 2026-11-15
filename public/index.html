@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clients · UI Kit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;500&family=Source+Sans+3:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="/app.css">
+<script type="module" src="/index.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="/">
+      <span class="brand-mark"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff35a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><circle cx="17.5" cy="17.5" r="3.5"/></svg></span>
+      UI Kit
+    </a>
+    <div class="who" id="who"></div>
+  </div>
+</header>
+<main class="page">
+  <div class="title-row">
+    <div>
+      <h1>Clients</h1>
+      <p class="muted" style="margin: 0; max-width: 62ch">Each client has one UI kit. Open a kit to fill in its values and to invite people.</p>
+    </div>
+    <div class="actions">
+      <button type="button" class="button" id="download-all">Download all data</button>
+    </div>
+  </div>
+
+  <form class="card card-pad inline-form" id="add-client" hidden>
+    <div class="field grow">
+      <label for="client-name">New client</label>
+      <input class="input" id="client-name" name="name" placeholder="Client name, for example Acme" maxlength="80" required autocomplete="off">
+    </div>
+    <button type="submit" class="button primary">Add client</button>
+  </form>
+
+  <p class="status" id="status" role="status"></p>
+
+  <div class="card table-wrap">
+    <table class="clients">
+      <thead><tr><th scope="col">Client</th><th scope="col">Colors</th><th scope="col">People</th><th scope="col">Last saved</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead>
+      <tbody id="clients"></tbody>
+    </table>
+  </div>
+</main>
+</body>
+</html>

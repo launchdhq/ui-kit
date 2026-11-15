@@ -2,8 +2,6 @@
 
 A small web app for designers. You keep one UI kit for each client: colors for light and dark mode, fonts and their weights, border widths, and the text of the preview. You invite your clients to look at their kit, or to edit it with you. The developer of each client downloads the values and uses them in code.
 
-> **Status:** the server works. The pages are in progress.
-
 ## What you can do
 
 - Add a client. Each client gets a kit that starts with a full set of basic sections.

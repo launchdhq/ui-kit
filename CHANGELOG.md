@@ -2,6 +2,12 @@
 
 Each version of UI Kit, newest first. The version is in `package.json`. When a change to `main` has a new version, GitHub makes a release with the notes from this file.
 
+## [0.6.1] - 2026-11-16
+
+### Fixed
+
+- The light and dark cells of the kit form use the kit's own `canvas` and `fg` colors, not the Launchd navy. They change while you type.
+
 ## [0.6.0] - 2026-11-16
 
 ### Added

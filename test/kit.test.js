@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { defaultKit, cleanKit } from "../kit.js";
+import { defaultKit, cleanKit, valueTag } from "../kit.js";
 
 const elements = (kit) => kit.sections.flatMap((section) => section.elements);
 const element = (kit, id) => elements(kit).find((each) => each.id === id);
@@ -10,19 +10,40 @@ function kitWith(element) {
   return { name: "Acme", notes: "", sections: [{ id: "extra", title: "Extra", elements: [element] }] };
 }
 
-test("a new kit starts with the sections of the Launchd brand form", () => {
+test("a new kit starts with neutral values and no brand", () => {
   const kit = defaultKit("Acme");
   assert.equal(kit.name, "Acme");
-  assert.deepEqual(kit.sections.map((section) => section.id),
-    ["backgrounds-and-text", "accent", "brand-extras", "fonts", "borders", "preview-text"]);
-  assert.equal(elements(kit).filter((each) => each.kind === "color").length, 13);
-  assert.deepEqual(element(kit, "canvas"),
-    { id: "canvas", label: "Page background", kind: "color", light: "#e8edea", dark: "#0f0a2e", source: { light: "Designer’s color", dark: "Added by Claude" } });
-  assert.deepEqual(element(kit, "font-display-light"),
-    { id: "font-display-light", label: "Secondary headlines", kind: "font", family: "Kanit", weight: 300, url: "", source: "Designer’s font" });
-  assert.equal(element(kit, "border-thick").width, 2);
   assert.equal(elements(kit).filter((each) => each.kind === "text" && each.value === "").length, 9);
-  assert.match(kit.sections.find((section) => section.id === "fonts").note, /Myriad Pro/);
+  assert.deepEqual(kit.sections.map((section) => section.id),
+    ["backgrounds-and-text", "accent", "extras", "fonts", "borders", "preview-text"]);
+  assert.equal(elements(kit).filter((each) => each.kind === "color").length, 13);
+  assert.deepEqual(element(kit, "canvas"), { id: "canvas", label: "Page background", kind: "color", light: "#ffffff", dark: "#121212" });
+  assert.deepEqual(element(kit, "decorative"), { id: "decorative", label: "Decorative fills", kind: "color", light: "#dddddd", dark: "#333333" });
+  assert.deepEqual(element(kit, "font-display"), { id: "font-display", label: "Headlines", kind: "font", family: "Inter", weight: 600, url: "" });
+  assert.deepEqual(elements(kit).filter((each) => each.kind === "font").map((each) => each.family), ["Inter", "Inter", "Inter"]);
+  assert.deepEqual(elements(kit).filter((each) => each.kind === "border").map((each) => each.width), [1, 2]);
+  assert.equal(elements(kit).filter((each) => each.source || each.id === "lavender").length, 0);
+  assert.equal(kit.sections.filter((section) => section.note).length, 0);
+});
+
+test("a value equal to its starting value is Default, and a changed value is Custom", () => {
+  const canvas = element(defaultKit("Acme"), "canvas");
+  assert.equal(valueTag(canvas, ["light"]), "Default");
+  assert.equal(valueTag({ ...canvas, light: "#FFFFFF" }, ["light"]), "Default");
+  assert.equal(valueTag({ ...canvas, dark: "#000000" }, ["light"]), "Default");
+  assert.equal(valueTag({ ...canvas, dark: "#000000" }, ["dark"]), "Custom");
+  const font = element(defaultKit("Acme"), "font-sans");
+  assert.equal(valueTag({ ...font, weight: 500 }, ["family", "weight", "url"]), "Custom");
+});
+
+test("an element that someone added is Custom", () => {
+  assert.equal(valueTag({ id: "error-text", kind: "color", light: "#000000", dark: "#ffffff" }, ["light"]), "Custom");
+  assert.equal(valueTag(undefined, ["light"]), "Custom");
+});
+
+test("the rules drop a source field", () => {
+  const { kit } = cleanKit(kitWith({ id: "c", label: "C", kind: "color", light: "#000000", dark: "#ffffff", source: "Added by Claude" }));
+  assert.equal(kit.sections[0].elements[0].source, undefined);
 });
 
 test("a new kit passes its own rules", () => {

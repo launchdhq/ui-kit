@@ -1,20 +1,14 @@
 export const VERSION = 1;
 export const KINDS = ["color", "font", "border", "text"];
 
-const DESIGNER = "Designer’s color";
-const CLAUDE = "Added by Claude";
-const SOURCE = { d: DESIGNER, c: CLAUDE };
-
 export const HEX = /^#[0-9a-fA-F]{6}$/;
 const ID = /^[a-z0-9][a-z0-9-]{0,39}$/;
 export const FAMILY = /^[A-Za-z0-9 ]{1,60}$/;
 export const FONT_FILE = /\.(woff2|woff|ttf|otf)$/i;
 const FONT_HOSTS = ["use.typekit.net", "fonts.googleapis.com", "fonts.bunny.net"];
 
-const color = (id, label, light, dark, sourceLight, sourceDark) =>
-  ({ id, label, kind: "color", light, dark, source: { light: SOURCE[sourceLight], dark: SOURCE[sourceDark] } });
-const font = (id, label, family, weight, source) =>
-  ({ id, label, kind: "font", family, weight, url: "", source });
+const color = (id, label, light, dark) => ({ id, label, kind: "color", light, dark });
+const font = (id, label, family, weight) => ({ id, label, kind: "font", family, weight, url: "" });
 const border = (id, label, width) => ({ id, label, kind: "border", width });
 const text = (id, label) => ({ id, label, kind: "text", value: "" });
 
@@ -24,28 +18,28 @@ export function defaultKit(name) {
     notes: "",
     sections: [
       { id: "backgrounds-and-text", title: "Backgrounds and text", elements: [
-        color("canvas", "Page background", "#e8edea", "#0f0a2e", "d", "c"),
-        color("surface", "Cards and panels", "#ffffff", "#1a1051", "c", "d"),
-        color("subtle", "Quiet fills, secondary buttons", "#dbe2de", "#251a6b", "c", "c"),
-        color("fg", "Body text and headings", "#1a1051", "#e8edea", "d", "d"),
-        color("muted", "Secondary text", "#5b5680", "#a9a7d6", "c", "c"),
-        color("border", "Lines and card edges", "#c9d1cc", "#2f2580", "c", "c"),
+        color("canvas", "Page background", "#ffffff", "#121212"),
+        color("surface", "Cards and panels", "#f7f7f7", "#1e1e1e"),
+        color("subtle", "Quiet fills, secondary buttons", "#eeeeee", "#2a2a2a"),
+        color("fg", "Body text and headings", "#111111", "#f2f2f2"),
+        color("muted", "Secondary text", "#666666", "#a3a3a3"),
+        color("border", "Lines and card edges", "#dddddd", "#333333"),
       ] },
       { id: "accent", title: "Accent", elements: [
-        color("accent", "Primary buttons, focus rings", "#1a1051", "#9290f4", "d", "d"),
-        color("on-accent", "Text on primary buttons", "#ffffff", "#1a1051", "c", "d"),
-        color("accent-soft", "Hover fills and badges", "#e0dffd", "#2b2370", "c", "c"),
-        color("accent-text", "Link text", "#3d38a6", "#c4c3fa", "c", "c"),
+        color("accent", "Primary buttons, focus rings", "#111111", "#f2f2f2"),
+        color("on-accent", "Text on primary buttons", "#ffffff", "#111111"),
+        color("accent-soft", "Hover fills and badges", "#eeeeee", "#2a2a2a"),
+        color("accent-text", "Link text", "#111111", "#f2f2f2"),
       ] },
-      { id: "brand-extras", title: "Brand extras", elements: [
-        color("highlight", "Highlighted words and bands", "#fff35a", "#fff35a", "d", "d"),
-        color("on-highlight", "Text on the highlight color", "#1a1051", "#1a1051", "d", "d"),
-        color("lavender", "Decorative fills", "#9290f4", "#9290f4", "d", "d"),
+      { id: "extras", title: "Extras", elements: [
+        color("highlight", "Highlighted words and bands", "#fff3a3", "#fff3a3"),
+        color("on-highlight", "Text on the highlight color", "#111111", "#111111"),
+        color("decorative", "Decorative fills", "#dddddd", "#333333"),
       ] },
-      { id: "fonts", title: "Fonts", note: "The brand sheet names Myriad Pro. Google Fonts does not have it, so Source Sans 3 is the stand-in.", elements: [
-        font("font-display", "Headlines", "Kanit", 500, "Designer’s font"),
-        font("font-display-light", "Secondary headlines", "Kanit", 300, "Designer’s font"),
-        font("font-sans", "Body text", "Source Sans 3", 400, "Added by Claude"),
+      { id: "fonts", title: "Fonts", elements: [
+        font("font-display", "Headlines", "Inter", 600),
+        font("font-display-light", "Secondary headlines", "Inter", 400),
+        font("font-sans", "Body text", "Inter", 400),
       ] },
       { id: "borders", title: "Borders", elements: [
         border("border-thin", "Lines and card edges", 1),
@@ -76,9 +70,12 @@ export function isFontUrl(value) {
   return url.protocol === "https:" && (FONT_FILE.test(url.pathname) || FONT_HOSTS.includes(url.hostname));
 }
 
-function cleanSource(source) {
-  if (isText(source, 40)) return source;
-  if (source && isText(source.light, 40) && isText(source.dark, 40)) return { light: source.light, dark: source.dark };
+const STARTING_VALUES = new Map(defaultKit("").sections.flatMap((section) => section.elements).map((element) => [element.id, element]));
+
+export function valueTag(element, keys) {
+  const start = STARTING_VALUES.get(element?.id);
+  const same = start !== undefined && start.kind === element.kind && keys.every((key) => String(start[key]).toLowerCase() === String(element[key]).toLowerCase());
+  return same ? "Default" : "Custom";
 }
 
 const RULES = {
@@ -130,8 +127,6 @@ export function cleanKit(input) {
         if (!valid(element[key])) fail(`${here}.${key}`, message);
         else if (element[key] !== undefined) cleanElement[key] = element[key];
       }
-      const source = cleanSource(element.source);
-      if (source) cleanElement.source = source;
       cleanSection.elements.push(cleanElement);
     });
     kit.sections.push(cleanSection);

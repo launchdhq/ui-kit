@@ -1,4 +1,4 @@
-import { FAMILY, FONT_FILE, HEX, KINDS, isFontUrl } from "/kit.js";
+import { FAMILY, FONT_FILE, HEX, KINDS, isFontUrl, valueTag } from "/kit.js";
 import { ROLE_LABELS, api, download, formatSaved, h, renderTopbar, setStatus, slug } from "/ui.js";
 
 const id = window.location.pathname.split("/").pop();
@@ -9,7 +9,7 @@ const saveButton = document.getElementById("save");
 
 const KIND_LABELS = { color: "Color", font: "Font", border: "Border", text: "Preview text" };
 const WEIGHTS = { 100: "Thin", 200: "Extra light", 300: "Light", 400: "Regular", 500: "Medium", 600: "Semibold", 700: "Bold", 800: "Extra bold", 900: "Black" };
-const PREVIEW_COLORS = ["canvas", "surface", "subtle", "fg", "muted", "border", "accent", "on-accent", "accent-soft", "accent-text", "highlight", "on-highlight", "lavender"];
+const PREVIEW_COLORS = ["canvas", "surface", "subtle", "fg", "muted", "border", "accent", "on-accent", "accent-soft", "accent-text", "highlight", "on-highlight", "decorative"];
 const PREVIEW_FONTS = ["font-display", "font-display-light", "font-sans"];
 const LOREM = {
   headline: "Lorem ipsum dolor sit amet",
@@ -30,6 +30,13 @@ const canEdit = () => role === "owner" || role === "editor";
 const elements = () => kit.sections.flatMap((section) => section.elements);
 const find = (elementId) => elements().find((element) => element.id === elementId);
 let borderPainters = [];
+let saved = new Map();
+const rememberSaved = () => { saved = new Map(elements().map((element) => [element.id, structuredClone(element)])); };
+
+function tag(element, keys) {
+  const name = valueTag(saved.get(element.id), keys);
+  return h("span", { class: `value-tag ${name.toLowerCase()}` }, name);
+}
 
 function uniqueId(text) {
   const base = slug(text, "item");
@@ -51,7 +58,6 @@ function textInput(props) {
 
 function colorCell(element, mode, field) {
   const value = element[mode];
-  const source = typeof element.source === "object" ? element.source?.[mode] : undefined;
   const text = textInput({ value, maxLength: 7, "aria-label": `${element.id} ${mode} value`, "data-field": `${field}.${mode}` });
   const swatch = canEdit()
     ? h("input", { type: "color", class: "picker", value: HEX.test(value) ? value.toLowerCase() : "#000000", "aria-label": `${element.id} ${mode} picker`,
@@ -64,7 +70,7 @@ function colorCell(element, mode, field) {
   });
   return h("div", { class: `cell mode ${mode}` },
     h("div", { class: "pair" }, swatch, text),
-    source && h("span", { class: `source${source.startsWith("Designer") ? " from-designer" : ""}` }, source));
+    tag(element, [mode]));
 }
 
 function borderCell(element, mode, field) {
@@ -82,7 +88,7 @@ function borderCell(element, mode, field) {
   } else {
     parts.push(h("span", { class: "small", style: "opacity: .75" }, "Dark mode"));
   }
-  return h("div", { class: `cell mode ${mode}` }, h("div", { class: "pair" }, ...parts));
+  return h("div", { class: `cell mode ${mode}` }, h("div", { class: "pair" }, ...parts), mode === "light" && tag(element, ["width"]));
 }
 
 function fontCells(element, field) {
@@ -109,7 +115,7 @@ function fontCells(element, field) {
   return [
     h("div", { class: "cell" }, family, url,
       canEdit() && h("span", { class: "small muted" }, "Leave the URL empty for Google Fonts. For Adobe Fonts, add this app's address to the kit's domains."),
-      element.source && h("span", { class: `source${element.source.startsWith("Designer") ? " from-designer" : ""}` }, element.source)),
+      tag(element, ["family", "weight", "url"])),
     h("div", { class: "cell" }, weight, sample, warning),
   ];
 }
@@ -305,9 +311,11 @@ saveButton.addEventListener("click", async () => {
   saveButton.disabled = true;
   setStatus(status, "Saving…");
   try {
-    const saved = await api("PUT", `/api/kits/${id}`, { name: kit.name, notes: kit.notes, sections: kit.sections });
-    Object.assign(kit, { updatedAt: saved.updatedAt, updatedBy: saved.updatedBy });
+    const result = await api("PUT", `/api/kits/${id}`, { name: kit.name, notes: kit.notes, sections: kit.sections });
+    Object.assign(kit, { updatedAt: result.updatedAt, updatedBy: result.updatedBy });
     dirty = false;
+    rememberSaved();
+    render();
     document.getElementById("saved").textContent = `Saved ${formatSaved(kit)}`;
     setStatus(status, "Saved.", "ok");
   } catch (error) {
@@ -343,6 +351,7 @@ window.addEventListener("beforeunload", (event) => { if (dirty) event.preventDef
 try {
   const [me, loaded] = await Promise.all([api("GET", "/api/me"), api("GET", `/api/kits/${id}`)]);
   kit = loaded;
+  rememberSaved();
   role = kit.role;
   renderTopbar(me, role);
   document.title = `${kit.name} · UI Kit`;

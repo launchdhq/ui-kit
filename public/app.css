@@ -101,8 +101,8 @@ textarea.input { padding: 8px 12px; min-height: 90px; resize: vertical; }
 .picker::-webkit-color-swatch { border: 0; border-radius: 5px; }
 .picker::-moz-color-swatch { border: 0; border-radius: 5px; }
 .chip { flex: none; width: 36px; height: 36px; border-radius: 6px; border: 1px solid currentColor; }
-.source { font-size: .7rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; opacity: .75; }
-.source.from-designer { opacity: 1; }
+.value-tag { font-size: .7rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; opacity: .7; }
+.value-tag.custom { opacity: 1; }
 .border-sample { flex: none; width: 56px; height: 36px; border-radius: 6px; border-style: solid; }
 .mode.light .border-sample { background: #ffffff; }
 .mode.dark .border-sample { background: rgba(255, 255, 255, .06); }
@@ -128,7 +128,7 @@ textarea.input { padding: 8px 12px; min-height: 90px; resize: vertical; }
 .pv .b2 { background: var(--p-subtle); color: var(--p-fg); border: var(--p-border-thin) solid var(--p-border); padding: 6px 13px; border-radius: 6px; font-size: .9rem; }
 .pv .link { color: var(--p-accent-text); font-size: .9rem; text-decoration: underline; }
 .pv .pcard { background: var(--p-surface); border: var(--p-border-thick) solid var(--p-border); border-radius: 6px; padding: 12px; display: flex; gap: 10px; align-items: flex-start; }
-.pv .dot { flex: none; width: 28px; height: 28px; border-radius: 6px; background: var(--p-lavender); }
+.pv .dot { flex: none; width: 28px; height: 28px; border-radius: 6px; background: var(--p-decorative); }
 .pv .pcard p { font-size: .85rem; }
 .pv .badge { align-self: flex-start; background: var(--p-accent-soft); color: var(--p-accent-text); font-size: .75rem; padding: 2px 8px; border-radius: 999px; }
 @media (max-width: 640px) {

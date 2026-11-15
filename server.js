@@ -38,7 +38,7 @@ export function createServer({ dataDir, ownerEmail }) {
 
   const kitPath = (id) => join(kitsDir, `${id}.json`);
   const roleOf = (kit, email) => (owner && email === owner ? "owner" : Object.hasOwn(kit.members, email) && kit.members[email]);
-  const exported = ({ version, name, notes, sections, updatedAt }) => ({ version, name, notes, sections, updatedAt });
+  const exported = ({ version, name, notes, labels = [], sections, updatedAt }) => ({ version, name, notes, labels, sections, updatedAt });
 
   async function load(id) {
     if (!UUID.test(id)) return;

@@ -124,7 +124,7 @@ test("a kit must have a name", () => {
 
 test("cleaning drops fields that the rules do not know", () => {
   const { kit } = cleanKit({ ...kitWith({ id: "t", label: "T", kind: "text", value: "Hi", onclick: "x" }), members: { "a@b.c": "editor" } });
-  assert.deepEqual(kit, { name: "Acme", notes: "", sections: [{ id: "extra", title: "Extra", elements: [{ id: "t", label: "T", kind: "text", value: "Hi" }] }] });
+  assert.deepEqual(kit, { name: "Acme", notes: "", labels: [], sections: [{ id: "extra", title: "Extra", elements: [{ id: "t", label: "T", kind: "text", value: "Hi" }] }] });
 });
 
 const cssKit = {
@@ -168,4 +168,37 @@ test("the CSS leaves out preview text, and a name cannot end its comment", () =>
   assert.doesNotMatch(css, /headline|Hello/);
   assert.equal(css.split("*/").length, 2);
   assert.match(css, /^\/\* Acme body\{\} UI kit \*\//);
+});
+
+const labelled = (labels, element) => ({ ...kitWith(element), labels });
+const color = { id: "c", label: "C", kind: "color", light: "#000000", dark: "#ffffff" };
+
+test("a new kit has an empty list of labels", () => {
+  assert.deepEqual(defaultKit("Acme").labels, []);
+  assert.deepEqual(cleanKit(defaultKit("Acme")).kit.labels, []);
+});
+
+test("a kit keeps its labels and the label of each value", () => {
+  const { kit, errors } = cleanKit(labelled(["By Claude", "By designer"], { ...color, tags: { light: "By Claude", dark: "By designer" } }));
+  assert.deepEqual(errors, []);
+  assert.deepEqual(kit.labels, ["By Claude", "By designer"]);
+  assert.deepEqual(kit.sections[0].elements[0].tags, { light: "By Claude", dark: "By designer" });
+});
+
+test("a value loses a label that is not in the kit's list, or that sits on a key the kind does not have", () => {
+  const { kit, errors } = cleanKit(labelled(["By Claude"], { ...color, tags: { light: "Removed label", dark: "By Claude", width: "By Claude" } }));
+  assert.deepEqual(errors, []);
+  assert.deepEqual(kit.sections[0].elements[0].tags, { dark: "By Claude" });
+});
+
+test("fonts and borders take one label each", () => {
+  const font = { id: "f", label: "F", kind: "font", family: "Inter", weight: 400, url: "", tags: { font: "By Claude" } };
+  const border = { id: "b", label: "B", kind: "border", width: 1, tags: { width: "By Claude" } };
+  assert.deepEqual(cleanKit(labelled(["By Claude"], font)).kit.sections[0].elements[0].tags, { font: "By Claude" });
+  assert.deepEqual(cleanKit(labelled(["By Claude"], border)).kit.sections[0].elements[0].tags, { width: "By Claude" });
+});
+
+test("a label has 1 to 30 characters, appears once, and a kit has at most 20 labels", () => {
+  assert.deepEqual(fields(cleanKit(labelled([" ", "x".repeat(31), "Ok", "Ok"], color))), ["labels.0", "labels.1", "labels.3"]);
+  assert.deepEqual(fields(cleanKit(labelled(Array.from({ length: 21 }, (_, n) => `Label ${n}`), color))), ["labels"]);
 });

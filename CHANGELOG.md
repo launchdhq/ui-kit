@@ -2,6 +2,12 @@
 
 Each version of UI Kit, newest first. The version is in `package.json`. When a change to `main` has a new version, GitHub makes a release with the notes from this file.
 
+## [0.5.0] - 2026-11-16
+
+### Added
+
+- Labels for each kit, for example "By designer" or "By Claude". Editors add and remove them at the top of the kit form, and choose one under each color, font and border. The labels are in Download data and in the PDF, not in the CSS.
+
 ## [0.4.0] - 2026-11-16
 
 ### Added

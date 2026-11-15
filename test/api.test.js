@@ -99,9 +99,19 @@ test("the export of a kit holds the values and not the members", async () => {
   for (const email of [OWNER, EDITOR, VIEWER]) {
     const { status, body } = await call("GET", `/api/kits/${kitId}/export`, email);
     assert.equal(status, 200, email);
-    assert.deepEqual(Object.keys(body).sort(), ["name", "notes", "sections", "updatedAt", "version"]);
+    assert.deepEqual(Object.keys(body).sort(), ["labels", "name", "notes", "sections", "updatedAt", "version"]);
   }
   assert.equal((await call("GET", `/api/kits/${kitId}/export`, STRANGER)).status, 404);
+});
+
+test("a saved kit keeps its labels, and the export holds them", async () => {
+  const kit = (await call("GET", `/api/kits/${kitId}`, EDITOR)).body;
+  kit.labels = ["By Claude"];
+  kit.sections[0].elements[0].tags = { light: "By Claude" };
+  assert.equal((await call("PUT", `/api/kits/${kitId}`, EDITOR, kit)).status, 200);
+  const exported = (await call("GET", `/api/kits/${kitId}/export`, VIEWER)).body;
+  assert.deepEqual(exported.labels, ["By Claude"]);
+  assert.deepEqual(exported.sections[0].elements[0].tags, { light: "By Claude" });
 });
 
 test("the export of all kits holds each kit that the person can read", async () => {

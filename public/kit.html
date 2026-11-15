@@ -28,11 +28,17 @@
       <span class="small muted" id="saved"></span>
     </div>
     <div class="actions no-print">
+      <button type="button" class="button" id="preview-viewer" hidden>Preview as viewer</button>
       <button type="button" class="button" id="download-pdf">Download PDF</button>
       <button type="button" class="button" id="download-data">Download data</button>
       <button type="button" class="button" id="copy-css">Copy CSS</button>
       <button type="button" class="button" id="download-css">Download CSS</button>
     </div>
+  </div>
+
+  <div class="preview-bar no-print" id="preview-bar" role="status" hidden>
+    <span>This is what viewers see. Nothing here changes the kit.</span>
+    <button type="button" class="button" id="back-to-editing">Back to editing</button>
   </div>
 
   <div class="notice no-print" id="viewer-notice" role="note" hidden>You can view this kit. You cannot change it. Ask the owner for edit permission.</div>

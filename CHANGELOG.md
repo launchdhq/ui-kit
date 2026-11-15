@@ -2,7 +2,11 @@
 
 Each version of UI Kit, newest first. The version is in `package.json`. When a change to `main` has a new version, GitHub makes a release with the notes from this file.
 
-## [Unreleased]
+## [0.6.0] - 2026-11-16
+
+### Added
+
+- Preview as viewer on the kit page. The owner and editors see the kit as a viewer sees it, then click Back to editing. The preview changes nothing on the server.
 
 ### Changed
 

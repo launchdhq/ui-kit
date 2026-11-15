@@ -74,7 +74,7 @@ export function createServer({ dataDir, ownerEmail }) {
 
   function view(id, kit, role) {
     const { members, ...rest } = kit;
-    return { id, ...rest, role, ...(role === "owner" && { members }) };
+    return { id, ...rest, revision: kit.revision ?? 1, role, ...(role === "owner" && { members }) };
   }
 
   async function kitFor(id, email, allowed) {
@@ -107,7 +107,7 @@ export function createServer({ dataDir, ownerEmail }) {
     ["POST", /^\/api\/kits$/, async ({ email, body }) => {
       if (email !== owner) throw new HttpError(403, { error: "Only the owner can add a kit." });
       const id = randomUUID();
-      const kit = { version: VERSION, ...stamp(validated(defaultKit(body?.name)), email), members: {} };
+      const kit = { version: VERSION, ...stamp(validated(defaultKit(body?.name)), email), revision: 1, members: {} };
       await store(id, kit);
       return [201, { id, ...kit }];
     }],
@@ -120,7 +120,11 @@ export function createServer({ dataDir, ownerEmail }) {
       exported((await kitFor(id, email, ["owner", "editor", "viewer"])).kit)],
     ["PUT", /^\/api\/kits\/([^/]+)$/, ({ email, body, params: [id] }) => oneAtATime(id, async () => {
       const { kit, role } = await kitFor(id, email, ["owner", "editor"]);
-      const saved = { version: VERSION, ...stamp(validated(body), email), members: kit.members };
+      const revision = kit.revision ?? 1;
+      if (body?.baseRevision !== undefined && body.baseRevision !== revision) {
+        throw new HttpError(409, { error: "Someone else changed this kit. Reload the page to see their changes." });
+      }
+      const saved = { version: VERSION, ...stamp(validated(body), email), revision: revision + 1, members: kit.members };
       await store(id, saved);
       return view(id, saved, role);
     })],

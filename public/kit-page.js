@@ -5,7 +5,7 @@ const id = window.location.pathname.split("/").pop();
 const status = document.getElementById("status");
 const sectionsElement = document.getElementById("sections");
 const notes = document.getElementById("notes");
-const saveButton = document.getElementById("save");
+const saveStatus = document.getElementById("save-status");
 
 const KIND_LABELS = { color: "Color", font: "Font", border: "Border", text: "Preview text" };
 const WEIGHTS = { 100: "Thin", 200: "Extra light", 300: "Light", 400: "Regular", 500: "Medium", 600: "Semibold", 700: "Bold", 800: "Extra bold", 900: "Black" };
@@ -30,11 +30,19 @@ const canEdit = () => role === "owner" || role === "editor";
 const elements = () => kit.sections.flatMap((section) => section.elements);
 const find = (elementId) => elements().find((element) => element.id === elementId);
 let borderPainters = [];
+let tagPainters = [];
 let saved = new Map();
-const rememberSaved = () => { saved = new Map(elements().map((element) => [element.id, structuredClone(element)])); };
+const rememberSaved = (sections = kit.sections) => {
+  saved = new Map(sections.flatMap((section) => section.elements).map((element) => [element.id, structuredClone(element)]));
+};
 
 function tag(element, keys, tagKey) {
-  const name = valueTag(saved.get(element.id), keys);
+  const auto = h("span", {});
+  tagPainters.push(() => {
+    const name = valueTag(saved.get(element.id), keys);
+    auto.className = `value-tag ${name.toLowerCase()}`;
+    auto.textContent = name;
+  });
   const label = element.tags?.[tagKey];
   const chooser = canEdit() && kit.labels.length > 0
     ? h("select", { class: "label-select", "aria-label": `Label for ${element.id} ${tagKey}`,
@@ -46,7 +54,7 @@ function tag(element, keys, tagKey) {
     h("option", { value: "" }, "No label"),
     kit.labels.map((each) => h("option", { value: each, selected: each === label }, each)))
     : label && h("span", { class: "value-tag label-tag" }, label);
-  return h("span", { class: "tag-row" }, h("span", { class: `value-tag ${name.toLowerCase()}` }, name), chooser);
+  return h("span", { class: "tag-row" }, auto, chooser);
 }
 
 function labelsSection() {
@@ -85,10 +93,74 @@ function uniqueId(text) {
   return candidate;
 }
 
+let edits = 0;
+let saveTimer;
+let saveQueue = Promise.resolve(true);
+let conflict = false;
+
+let hideTimer;
+function showSave(kind, ...content) {
+  clearTimeout(hideTimer);
+  saveStatus.className = `save-status no-print ${kind}`;
+  saveStatus.replaceChildren(...content);
+  saveStatus.hidden = false;
+  if (kind === "ok") hideTimer = setTimeout(() => { saveStatus.hidden = true; }, 2500);
+}
+
 function changed() {
   dirty = true;
-  setStatus(status, "You have changes that are not saved.");
+  edits++;
   refreshPreview();
+  if (conflict) return;
+  if (saveStatus.classList.contains("ok")) saveStatus.hidden = true;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveNow, 1000);
+}
+
+function saveNow() {
+  clearTimeout(saveTimer);
+  saveQueue = saveQueue.then(() => (conflict ? false : dirty ? saveOnce() : true));
+  return saveQueue;
+}
+
+async function saveOnce() {
+  const sent = edits;
+  const sections = structuredClone(kit.sections);
+  document.querySelectorAll("[aria-invalid]").forEach((input) => input.removeAttribute("aria-invalid"));
+  showSave("", "Saving…");
+  try {
+    const result = await api("PUT", `/api/kits/${id}`, { name: kit.name, notes: kit.notes, labels: kit.labels, sections, baseRevision: kit.revision });
+    Object.assign(kit, { updatedAt: result.updatedAt, updatedBy: result.updatedBy, revision: result.revision });
+    rememberSaved(sections);
+    tagPainters.forEach((paint) => paint());
+    document.getElementById("saved").textContent = `Saved ${formatSaved(kit)}`;
+    if (edits !== sent) return saveOnce();
+    dirty = false;
+    showSave("ok", `Saved ${new Date(kit.updatedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`);
+    return true;
+  } catch (error) {
+    if (error.status === 409) {
+      conflict = true;
+      showSave("error", "Someone else changed this kit. Your last changes are not saved. ",
+        h("button", { type: "button", class: "button", onClick: () => { dirty = false; window.location.reload(); } }, "Reload"));
+      return false;
+    }
+    const errors = error.data?.errors ?? [];
+    if (!errors.length) {
+      showSave("error", error.status ? `Not saved. ${error.message}` : "Not saved. Check your connection. The next change tries again.");
+      return false;
+    }
+    errors.map(({ field }) => document.querySelector(`[data-field="${field}"]`)).filter(Boolean)
+      .forEach((input) => input.setAttribute("aria-invalid", "true"));
+    showSave("error", `Not saved. ${errors[0].message} Fix the values marked in red.`);
+    return false;
+  }
+}
+
+async function savedFirst() {
+  if (await saveNow()) return true;
+  setStatus(status, "The kit is not saved. Fix the problem in the notice at the top, then try again.", "error");
+  return false;
 }
 
 function textInput(props) {
@@ -220,6 +292,7 @@ function addElementForm(section) {
 
 function render() {
   borderPainters = [];
+  tagPainters = [];
   sectionsElement.replaceChildren(...labelsSection(), ...kit.sections.map((section, s) => h("section", { class: "section", "aria-label": section.title },
     h("div", { class: "section-head" }, h("h2", {}, section.title),
       canEdit() && h("button", { type: "button", class: "button quiet no-print", "aria-label": `Remove the section ${section.title}`,
@@ -255,6 +328,7 @@ const fontStack = (family) => (FAMILY.test(family ?? "") ? `"${family}", ui-sans
 function refreshPreview() {
   if (!kit) return;
   borderPainters.forEach((paint) => paint());
+  tagPainters.forEach((paint) => paint());
   for (const mode of ["light", "dark"]) {
     const box = document.getElementById(`pv-${mode}`);
     for (const colorId of PREVIEW_COLORS) {
@@ -345,39 +419,15 @@ document.getElementById("add-section").addEventListener("submit", (event) => {
 
 notes.addEventListener("input", () => { kit.notes = notes.value; changed(); });
 
-saveButton.addEventListener("click", async () => {
-  document.querySelectorAll("[aria-invalid]").forEach((input) => input.removeAttribute("aria-invalid"));
-  saveButton.disabled = true;
-  setStatus(status, "Saving…");
-  try {
-    const result = await api("PUT", `/api/kits/${id}`, { name: kit.name, notes: kit.notes, labels: kit.labels, sections: kit.sections });
-    Object.assign(kit, { updatedAt: result.updatedAt, updatedBy: result.updatedBy });
-    dirty = false;
-    rememberSaved();
-    render();
-    document.getElementById("saved").textContent = `Saved ${formatSaved(kit)}`;
-    setStatus(status, "Saved.", "ok");
-  } catch (error) {
-    const errors = error.data?.errors ?? [];
-    if (!errors.length) return setStatus(status, error.message, "error");
-    const inputs = errors.map(({ field }) => document.querySelector(`[data-field="${field}"]`)).filter(Boolean);
-    inputs.forEach((input) => input.setAttribute("aria-invalid", "true"));
-    inputs[0]?.focus();
-    setStatus(status, `${errors.length === 1 ? "1 value breaks a rule" : `${errors.length} values break a rule`}. ${errors[0].message} Fix the values marked in red, then save again.`, "error");
-  } finally {
-    saveButton.disabled = false;
-  }
-});
-
 document.getElementById("download-pdf").addEventListener("click", () => window.print());
 
-document.getElementById("download-data").addEventListener("click", () => {
-  if (dirty) return setStatus(status, "Save your changes first. The download has only the saved values.", "error");
+document.getElementById("download-data").addEventListener("click", async () => {
+  if (!(await savedFirst())) return;
   download(`/api/kits/${id}/export`, `${slug(kit.name, "kit")}-ui-kit.json`).catch((error) => setStatus(status, error.message, "error"));
 });
 
 document.getElementById("copy-css").addEventListener("click", async () => {
-  if (dirty) return setStatus(status, "Save your changes first. The CSS has only the saved values.", "error");
+  if (!(await savedFirst())) return;
   try {
     await navigator.clipboard.writeText(toCss(kit));
     setStatus(status, "Copied the CSS. Paste it into your stylesheet.", "ok");
@@ -386,14 +436,15 @@ document.getElementById("copy-css").addEventListener("click", async () => {
   }
 });
 
-document.getElementById("download-css").addEventListener("click", () => {
-  if (dirty) return setStatus(status, "Save your changes first. The CSS has only the saved values.", "error");
+document.getElementById("download-css").addEventListener("click", async () => {
+  if (!(await savedFirst())) return;
   saveFile(toCss(kit), `${slug(kit.name, "kit")}-ui-kit.css`, "text/css");
 });
 
 document.getElementById("delete-kit").addEventListener("click", async () => {
   if (!window.confirm(`Delete the kit of ${kit.name}? You cannot undo this.`)) return;
   try {
+    clearTimeout(saveTimer);
     await api("DELETE", `/api/kits/${id}`);
     dirty = false;
     window.location.href = "/";
@@ -413,7 +464,6 @@ try {
   document.getElementById("saved").textContent = kit.updatedAt ? `Saved ${formatSaved(kit)}` : "Not saved yet";
   notes.value = kit.notes ?? "";
   notes.disabled = !canEdit();
-  saveButton.hidden = !canEdit();
   document.getElementById("add-section").hidden = !canEdit();
   document.getElementById("viewer-notice").hidden = canEdit();
   document.getElementById("people").hidden = role !== "owner";

@@ -104,6 +104,27 @@ test("the export of a kit holds the values and not the members", async () => {
   assert.equal((await call("GET", `/api/kits/${kitId}/export`, STRANGER)).status, 404);
 });
 
+test("each save gives the kit a new revision", async () => {
+  const kit = (await call("GET", `/api/kits/${kitId}`, EDITOR)).body;
+  assert.equal(kit.revision, 1);
+  const saved = await call("PUT", `/api/kits/${kitId}`, EDITOR, { ...kit, baseRevision: 1 });
+  assert.equal(saved.status, 200);
+  assert.equal(saved.body.revision, 2);
+});
+
+test("a save from an old copy of the kit gets 409 and changes nothing", async () => {
+  const kit = (await call("GET", `/api/kits/${kitId}`, EDITOR)).body;
+  await call("PUT", `/api/kits/${kitId}`, OWNER, { ...kit, notes: "Owner was here", baseRevision: 1 });
+  const late = await call("PUT", `/api/kits/${kitId}`, EDITOR, { ...kit, notes: "Editor was here", baseRevision: 1 });
+  assert.equal(late.status, 409);
+  assert.equal((await call("GET", `/api/kits/${kitId}`, VIEWER)).body.notes, "Owner was here");
+});
+
+test("a member change does not change the revision", async () => {
+  await call("PUT", `/api/kits/${kitId}/members/${STRANGER}`, OWNER, { role: "viewer" });
+  assert.equal((await call("GET", `/api/kits/${kitId}`, EDITOR)).body.revision, 1);
+});
+
 test("a saved kit keeps its labels, and the export holds them", async () => {
   const kit = (await call("GET", `/api/kits/${kitId}`, EDITOR)).body;
   kit.labels = ["By Claude"];

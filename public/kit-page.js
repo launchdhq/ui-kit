@@ -341,6 +341,13 @@ const fontStack = (family) => (FAMILY.test(family ?? "") ? `"${family}", ui-sans
 
 function refreshPreview() {
   if (!kit) return;
+  for (const mode of ["light", "dark"]) {
+    for (const [variable, colorId] of [["bg", "canvas"], ["fg", "fg"]]) {
+      const value = find(colorId)?.[mode];
+      if (HEX.test(value ?? "")) sectionsElement.style.setProperty(`--${mode}-${variable}`, value);
+      else sectionsElement.style.removeProperty(`--${mode}-${variable}`);
+    }
+  }
   borderPainters.forEach((paint) => paint());
   tagPainters.forEach((paint) => paint());
   for (const mode of ["light", "dark"]) {

@@ -1,0 +1,25 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Make a release for a new version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          if gh release view "v$version" > /dev/null 2>&1; then
+            echo "v$version already has a release."
+            exit 0
+          fi
+          awk -v heading="## [$version]" 'index($0, "## [") == 1 { keep = index($0, heading) == 1; next } keep' CHANGELOG.md > notes.md
+          gh release create "v$version" --title "v$version" --notes-file notes.md --target "$GITHUB_SHA"

@@ -27,6 +27,7 @@ export async function api(method, path, body) {
 
 export function renderTopbar(me, role = me.owner ? "owner" : undefined) {
   document.getElementById("who").replaceChildren(h("span", {}, me.email), role && h("span", { class: "pill" }, ROLE_LABELS[role]));
+  document.querySelector(".brand").append(h("span", { class: "version" }, `v${me.version}`));
 }
 
 export function setStatus(element, text, kind = "") {

@@ -4,6 +4,7 @@ import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promise
 import { extname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { VERSION, defaultKit, cleanKit } from "./kit.js";
+import packageJson from "./package.json" with { type: "json" };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const EMAIL = /^[^\s@/]+@[^\s@/]+\.[^\s@/]+$/;
@@ -95,7 +96,7 @@ export function createServer({ dataDir, ownerEmail }) {
   }
 
   const routes = [
-    ["GET", /^\/api\/me$/, async ({ email }) => ({ email, owner: email === owner })],
+    ["GET", /^\/api\/me$/, async ({ email }) => ({ email, owner: email === owner, version: packageJson.version })],
     ["GET", /^\/api\/kits$/, async ({ email }) => (await readable(email)).map((kit) => {
       const role = roleOf(kit, email);
       const colors = kit.sections.flatMap((section) => section.elements).filter((element) => element.kind === "color");

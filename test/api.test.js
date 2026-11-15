@@ -239,9 +239,22 @@ test("a body over 1 MB gets 413, even when it has fewer than a million character
   assert.equal((await call("PUT", `/api/kits/${kitId}`, EDITOR, { notes })).status, 413);
 });
 
+test("me tells the page the app version from package.json", async () => {
+  const { version } = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+  assert.match(version, /^\d+\.\d+\.\d+$/);
+  assert.equal((await call("GET", "/api/me", VIEWER)).body.version, version);
+});
+
+test("the changelog has a section for the app version", async () => {
+  const { version } = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+  const changelog = await readFile(new URL("../CHANGELOG.md", import.meta.url), "utf8");
+  assert.match(changelog, new RegExp(`^## \\[${version.replaceAll(".", "\\.")}\\] - \\d{4}-\\d{2}-\\d{2}$`, "m"));
+});
+
 test("me tells the page who the visitor is", async () => {
-  assert.deepEqual((await call("GET", "/api/me", OWNER)).body, { email: OWNER, owner: true });
-  assert.deepEqual((await call("GET", "/api/me", VIEWER)).body, { email: VIEWER, owner: false });
+  const { version } = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+  assert.deepEqual((await call("GET", "/api/me", OWNER)).body, { email: OWNER, owner: true, version });
+  assert.deepEqual((await call("GET", "/api/me", VIEWER)).body, { email: VIEWER, owner: false, version });
   assert.equal((await call("GET", "/api/me")).status, 401);
 });
 

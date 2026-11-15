@@ -84,6 +84,12 @@ The app reads the visitor's email from the `X-Launchd-Email` header, which Launc
 
 Run the tests with `npm test`.
 
+## Versions
+
+The app shows its version next to "UI Kit" at the top of each page. [CHANGELOG.md](CHANGELOG.md) lists what each version changed. To update your app, pull the newest version, then run `golaunchd deploy` again. Your kits stay.
+
+To make a new version, change `version` in `package.json` and add a section for it at the top of `CHANGELOG.md` in the same pull request. When the pull request is merged, GitHub makes the release.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).

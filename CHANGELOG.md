@@ -2,6 +2,14 @@
 
 Each version of UI Kit, newest first. The version is in `package.json`. When a change to `main` has a new version, GitHub makes a release with the notes from this file.
 
+## [Unreleased]
+
+### Changed
+
+- The kit page saves by itself, 1 second after the last change. A notice at the top says "Saved", or what stops the save. The Save button is gone.
+- A save from an old copy of a kit no longer overwrites newer changes. The page says that someone else changed the kit and offers Reload.
+- Download data, Copy CSS and Download CSS save a waiting change first.
+
 ## [0.5.0] - 2026-11-16
 
 ### Added
